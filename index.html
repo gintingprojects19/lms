@@ -12,12 +12,55 @@
     <p>Jangan meninggalkan halaman ujian.</p>
 
     <script>
-        window.addEventListener("blur", function () {
-            window.location.replace("stop.html");
-        });
-        window.addEventListener("resize", function () {
-            window.location.replace("stop.html");
-        });
+        
+(() => {
+    let halamanDitinggalkan = false;
+    let waktuHalamanTersembunyi = 0;
+    let sedangDialihkan = false;
+
+    // Sesuaikan dengan halaman penghentian ujian
+    const halamanStop = "stop.html";
+
+    // Ambang waktu untuk mengabaikan gangguan yang sangat singkat
+    const batasWaktu = 1000;
+
+    // Blur hanya dicatat, bukan langsung menghentikan ujian
+    window.addEventListener("blur", function () {
+        console.log("Window blur: menunggu pemeriksaan lanjutan");
+    });
+
+    window.addEventListener("focus", function () {
+        console.log("Window kembali fokus");
+    });
+
+    // Deteksi halaman benar-benar tidak terlihat
+    document.addEventListener("visibilitychange", function () {
+
+        if (document.visibilityState === "hidden") {
+            halamanDitinggalkan = true;
+            waktuHalamanTersembunyi = Date.now();
+            return;
+        }
+
+        if (
+            document.visibilityState === "visible" &&
+            halamanDitinggalkan &&
+            !sedangDialihkan
+        ) {
+            const durasi =
+                Date.now() - waktuHalamanTersembunyi;
+
+            halamanDitinggalkan = false;
+
+            if (durasi >= batasWaktu) {
+                sedangDialihkan = true;
+                window.location.replace(halamanStop);
+            }
+        }
+    });
+
+})();
+
     </script>
 
 </body>
