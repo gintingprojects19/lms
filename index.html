@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -12,54 +11,63 @@
     <p>Jangan meninggalkan halaman ujian.</p>
 
     <script>
-        
 
-    let halamanDitinggalkan = false;
-    let waktuHalamanTersembunyi = 0;
-    let sedangDialihkan = false;
+let tinggiAwal = window.visualViewport
+    ? window.visualViewport.height
+    : window.innerHeight;
 
-    // Sesuaikan dengan halaman penghentian ujian
-    const halamanStop = "stop.html";
+let keyboardAktif = false;
+let sedangProses = false;
+let waktuResize = 0;
 
-    // Ambang waktu untuk mengabaikan gangguan yang sangat singkat
-    const batasWaktu = 1000;
+// Deteksi kemungkinan keyboard virtual HP
+if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", function () {
+        let tinggiSekarang = window.visualViewport.height;
 
-    // Blur hanya dicatat, bukan langsung menghentikan ujian
-    window.addEventListener("blur", function () {
-        console.log("Window blur: menunggu pemeriksaan lanjutan");
-    });
-
-    window.addEventListener("focus", function () {
-        console.log("Window kembali fokus");
-    });
-
-    // Deteksi halaman benar-benar tidak terlihat
-    document.addEventListener("visibilitychange", function () {
-
-        if (document.visibilityState === "hidden") {
-            halamanDitinggalkan = true;
-            waktuHalamanTersembunyi = Date.now();
-            return;
+        if (tinggiAwal - tinggiSekarang > 120) {
+            keyboardAktif = true;
+        } else {
+            keyboardAktif = false;
         }
 
-        if (
-            document.visibilityState === "visible" &&
-            halamanDitinggalkan &&
-            !sedangDialihkan
-        ) {
-            const durasi =
-                Date.now() - waktuHalamanTersembunyi;
-
-            halamanDitinggalkan = false;
-
-            if (durasi >= batasWaktu) {
-                sedangDialihkan = true;
-                window.location.replace(halamanStop);
-            }
-        }
+        waktuResize = Date.now();
     });
+}
 
+// Fungsi blur tetap digunakan
+window.addEventListener("blur", function () {
 
+    // Jika sedang proses pengalihan, hentikan pemeriksaan
+    if (sedangProses) {
+        return;
+    }
+
+    // Abaikan blur jika keyboard terdeteksi
+    if (keyboardAktif) {
+        return;
+    }
+
+    // Abaikan blur yang berdekatan dengan perubahan viewport
+    if (Date.now() - waktuResize < 1000) {
+        return;
+    }
+
+    // Akhiri ujian
+    sedangProses = true;
+    window.location.replace("stop.html");
+
+});
+
+// Periksa kembali kondisi keyboard ketika halaman fokus
+window.addEventListener("focus", function () {
+
+    if (window.visualViewport) {
+        keyboardAktif =
+            tinggiAwal - window.visualViewport.height > 120;
+    }
+
+});
 
     </script>
 
