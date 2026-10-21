@@ -6,7 +6,7 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0">
 
-    <title>Halaman Ujian - Portal Sekolah</title>
+    <title>Ujian - Portal Sekolah</title>
 
     <style>
         * {
@@ -15,26 +15,27 @@
 
         body {
             margin: 0;
-            padding: 15px;
+            padding: 12px;
             font-family: Arial, sans-serif;
             background: #f1f5f9;
         }
 
         h2 {
-            margin-top: 0;
             color: #1e293b;
         }
 
-        p {
-            color: #475569;
-            line-height: 1.5;
+        .keterangan {
+            padding: 12px;
+            margin-bottom: 12px;
+            background: #fff;
+            border-radius: 8px;
         }
 
-        .container {
+        .form-container {
             width: 100%;
+            overflow: hidden;
             background: white;
             border-radius: 8px;
-            overflow: hidden;
         }
 
         iframe {
@@ -42,12 +43,12 @@
             width: 100%;
             height: 80vh;
             min-height: 450px;
-            border: none;
+            border: 0;
         }
 
         @media (max-width: 600px) {
             body {
-                padding: 8px;
+                padding: 6px;
             }
 
             iframe {
@@ -62,12 +63,12 @@
 
     <h2>Halaman Ujian</h2>
 
-    <p>
+    <div class="keterangan">
         Silakan mengerjakan soal dengan teliti.
         Jangan meninggalkan halaman ujian.
-    </p>
+    </div>
 
-    <div class="container">
+    <div class="form-container">
         <iframe
             id="iframeUjian"
             title="Formulir Ujian"
@@ -75,125 +76,152 @@
         </iframe>
     </div>
 
-    <script>
-    "use strict";
+<script>
+"use strict";
 
-    // ========================================
-    // PENGATURAN
-    // ========================================
+// ==========================================
+// PENGATURAN
+// ==========================================
 
-    const HALAMAN_STOP = "stop.html";
-    const TUNDA_BLUR = 700;
+const HALAMAN_STOP = "stop.html";
+const BATAS_KEYBOARD = 120;
+const TUNDA_PEMERIKSAAN = 1000;
 
-    let sedangProses = false;
-    let timerBlur = null;
-    let waktuResize = 0;
+let sedangProses = false;
+let timerBlur = null;
+let timerResize = null;
 
-    // ========================================
-    // DETEKSI RESIZE / KEYBOARD HP
-    // ========================================
+let waktuResize = 0;
+let tinggiAwal = window.visualViewport
+    ? window.visualViewport.height
+    : window.innerHeight;
 
-    if (window.visualViewport) {
-        window.visualViewport.addEventListener("resize", function () {
-            waktuResize = Date.now();
-        });
+// ==========================================
+// FUNGSI MENGAKHIRI UJIAN
+// ==========================================
+
+function akhiriUjian(alasan) {
+    if (sedangProses) {
+        return;
     }
 
-    window.addEventListener("resize", function () {
-        waktuResize = Date.now();
-    });
+    sedangProses = true;
 
-    // ========================================
-    // FUNGSI AKHIRI UJIAN
-    // ========================================
+    console.warn("Ujian dihentikan:", alasan);
 
-    function akhiriUjian(alasan) {
+    window.location.replace(HALAMAN_STOP);
+}
+
+// ==========================================
+// DETEKSI KEMUNGKINAN KEYBOARD VIRTUAL
+// ==========================================
+
+function keyboardTerlihat() {
+    if (!window.visualViewport) {
+        return false;
+    }
+
+    const tinggiSekarang = window.visualViewport.height;
+
+    return (tinggiAwal - tinggiSekarang) > BATAS_KEYBOARD;
+}
+
+// ==========================================
+// DETEKSI RESIZE
+// ==========================================
+
+function periksaResize() {
+    waktuResize = Date.now();
+
+    if (timerResize !== null) {
+        clearTimeout(timerResize);
+    }
+
+    timerResize = setTimeout(function () {
+        timerResize = null;
+
+        // Jangan menghentikan ujian hanya karena resize.
+        // Resize juga dapat disebabkan oleh keyboard,
+        // orientasi layar, atau perubahan browser.
+        if (keyboardTerlihat()) {
+            return;
+        }
+
+        // Perubahan ukuran saja bukan bukti siswa
+        // meninggalkan ujian atau membuka AI.
+    }, TUNDA_PEMERIKSAAN);
+}
+
+window.addEventListener("resize", periksaResize);
+
+if (window.visualViewport) {
+    window.visualViewport.addEventListener(
+        "resize",
+        periksaResize
+    );
+}
+
+// ==========================================
+// DETEKSI BLUR
+// ==========================================
+
+window.addEventListener("blur", function () {
+    if (sedangProses) {
+        return;
+    }
+
+    if (timerBlur !== null) {
+        clearTimeout(timerBlur);
+    }
+
+    timerBlur = setTimeout(function () {
+        timerBlur = null;
 
         if (sedangProses) {
             return;
         }
 
-        sedangProses = true;
-
-        console.warn("Ujian dihentikan:", alasan);
-
-        // Arahkan ke halaman penghentian ujian
-        window.location.replace(HALAMAN_STOP);
-    }
-
-    // ========================================
-    // DETEKSI HALAMAN MASUK LATAR BELAKANG
-    // ========================================
-
-    document.addEventListener("visibilitychange", function () {
-
+        // Jangan langsung mengakhiri ujian karena blur.
+        // Periksa apakah browser melaporkan halaman hidden.
         if (document.visibilityState === "hidden") {
-
-            // Halaman benar-benar dilaporkan tersembunyi
-            // oleh browser.
-            akhiriUjian("Halaman masuk ke latar belakang");
-
-        }
-    });
-
-    // ========================================
-    // DETEKSI BLUR SEBAGAI PEMERIKSAAN TAMBAHAN
-    // ========================================
-
-    window.addEventListener("blur", function () {
-
-        if (sedangProses) {
-            return;
+            akhiriUjian("Halaman kehilangan visibilitas");
         }
 
-        if (timerBlur !== null) {
-            clearTimeout(timerBlur);
-        }
+    }, TUNDA_PEMERIKSAAN);
+});
 
-        timerBlur = setTimeout(function () {
+// ==========================================
+// DETEKSI HALAMAN MASUK LATAR BELAKANG
+// ==========================================
 
-            timerBlur = null;
+document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") {
+        akhiriUjian("Halaman masuk ke latar belakang");
+    }
+});
 
-            if (sedangProses) {
-                return;
-            }
+// ==========================================
+// DETEKSI SAAT HALAMAN KEMBALI FOKUS
+// ==========================================
 
-            // Jangan akhiri hanya karena blur.
-            // Tunggu status halaman dari browser.
-            if (document.visibilityState === "hidden") {
-                akhiriUjian("Blur disertai halaman tersembunyi");
-            }
+window.addEventListener("focus", function () {
+    if (timerBlur !== null) {
+        clearTimeout(timerBlur);
+        timerBlur = null;
+    }
+});
 
-        }, TUNDA_BLUR);
+// ==========================================
+// DETEKSI HALAMAN DIBUKA KEMBALI
+// ==========================================
 
-    });
+window.addEventListener("pageshow", function () {
+    if (document.visibilityState === "hidden") {
+        akhiriUjian("Halaman dibuka dalam kondisi tersembunyi");
+    }
+});
 
-    // ========================================
-    // BATALKAN PEMERIKSAAN JIKA KEMBALI FOKUS
-    // ========================================
-
-    window.addEventListener("focus", function () {
-
-        if (timerBlur !== null) {
-            clearTimeout(timerBlur);
-            timerBlur = null;
-        }
-
-    });
-
-    // ========================================
-    // PEMERIKSAAN SAAT HALAMAN KEMBALI TERLIHAT
-    // ========================================
-
-    document.addEventListener("visibilitychange", function () {
-
-        if (document.visibilityState === "visible") {
-            console.log("Halaman ujian terlihat kembali.");
-        }
-
-    });
-
-    </script>
+</script>
 
 </body>
 </html>
