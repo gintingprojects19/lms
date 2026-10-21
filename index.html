@@ -1,11 +1,13 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
+
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0">
 
-    <title>Halaman Ujian</title>
+    <title>Halaman Ujian - Portal Sekolah</title>
 
     <style>
         * {
@@ -21,6 +23,19 @@
 
         h2 {
             color: #1e293b;
+            margin-top: 0;
+        }
+
+        p {
+            color: #475569;
+            line-height: 1.5;
+        }
+
+        .form-container {
+            width: 100%;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
         }
 
         iframe {
@@ -29,7 +44,17 @@
             height: 80vh;
             min-height: 400px;
             border: none;
-            background: white;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 6px;
+            }
+
+            iframe {
+                height: 78vh;
+                min-height: 400px;
+            }
         }
     </style>
 </head>
@@ -37,111 +62,146 @@
 <body>
 
     <h2>Halaman Ujian</h2>
-    <p>Silakan mengerjakan soal dengan teliti.</p>
 
-    <iframe
-        id="iframeUjian"
-        title="Google Forms Ujian"
-        src="https://docs.google.com/forms/d/e/1FAIpQLScMgSUSrQkh3Eck1oNI93NkhnjtF6eQrw-VeJZcMcwWcKYH_w/viewform?usp=sharing&ouid=110367447242542532252">
-    </iframe>
+    <p>
+        Silakan mengerjakan soal dengan teliti.
+        Jangan meninggalkan halaman ujian.
+    </p>
+
+    <div class="form-container">
+
+        <iframe
+            id="iframeUjian"
+            title="Google Forms Ujian"
+            src="https://docs.google.com/forms/d/e/1FAIpQLScMgSUSrQkh3Eck1oNI93NkhnjtF6eQrw-VeJZcMcwWcKYH_w/viewform?usp=sharing&ouid=110367447242542532252">
+        </iframe>
+
+    </div>
 
 <script>
 "use strict";
 
-// =======================================
-// PENGATURAN
-// =======================================
+// =============================================
+// 1. PENGATURAN
+// =============================================
 
 const HALAMAN_STOP = "stop.html";
+
 const BATAS_KEYBOARD = 120;
+const WAKTU_INISIALISASI = 2000;
 const TUNDA_BLUR = 1000;
 const TUNDA_RESIZE = 700;
 
 let sedangProses = false;
+let siapMendeteksi = false;
 let keyboardAktif = false;
 
 let timerBlur = null;
 let timerResize = null;
 
-let tinggiAwal = window.visualViewport
-    ? window.visualViewport.height
-    : window.innerHeight;
+let tinggiAwal = tinggiViewport();
 
-// =======================================
-// FUNGSI TINGGI VIEWPORT
-// =======================================
+// =============================================
+// 2. MENGAMBIL TINGGI VIEWPORT
+// =============================================
 
-function tinggiSekarang() {
+function tinggiViewport() {
     return window.visualViewport
         ? window.visualViewport.height
         : window.innerHeight;
 }
 
-// =======================================
-// DETEKSI KEYBOARD VIRTUAL
-// =======================================
+// =============================================
+// 3. INISIALISASI HALAMAN
+// =============================================
+
+// Beri waktu untuk proses awal halaman dan iframe.
+// Resize selama tahap ini tidak digunakan untuk
+// mengakhiri ujian.
+
+setTimeout(function () {
+
+    tinggiAwal = tinggiViewport();
+    keyboardAktif = false;
+    siapMendeteksi = true;
+
+    console.log("Deteksi ujian aktif.");
+
+}, WAKTU_INISIALISASI);
+
+// =============================================
+// 4. DETEKSI KEYBOARD VIRTUAL
+// =============================================
 
 function periksaKeyboard() {
-    const selisih = tinggiAwal - tinggiSekarang();
+
+    const tinggiSekarang = tinggiViewport();
+
+    const selisih = tinggiAwal - tinggiSekarang;
 
     keyboardAktif = selisih > BATAS_KEYBOARD;
 
     return keyboardAktif;
 }
 
-// =======================================
-// AKHIRI UJIAN
-// =======================================
+// =============================================
+// 5. FUNGSI MENGAKHIRI UJIAN
+// =============================================
 
 function akhiriUjian(alasan) {
+
     if (sedangProses) {
         return;
     }
 
     sedangProses = true;
 
-    console.warn("Ujian diakhiri:", alasan);
+    console.warn("Ujian dihentikan:", alasan);
 
     window.location.replace(HALAMAN_STOP);
 }
 
-// =======================================
-// RESIZE VIEWPORT
-// =======================================
+// =============================================
+// 6. DETEKSI RESIZE
+// =============================================
 
 function tanganiResize() {
-    if (sedangProses) {
+
+    if (!siapMendeteksi || sedangProses) {
         return;
     }
 
     periksaKeyboard();
 
-    // Jika keyboard aktif, jangan akhiri ujian.
+    // Abaikan perubahan ukuran yang kemungkinan
+    // disebabkan keyboard virtual.
     if (keyboardAktif) {
-        if (timerResize !== null) {
-            clearTimeout(timerResize);
-            timerResize = null;
-        }
+
+        clearTimeout(timerResize);
+        timerResize = null;
+
         return;
     }
 
-    if (timerResize !== null) {
-        clearTimeout(timerResize);
-    }
+    clearTimeout(timerResize);
 
     timerResize = setTimeout(function () {
+
         timerResize = null;
 
-        periksaKeyboard();
-
-        // Abaikan resize jika ternyata keyboard aktif.
-        if (keyboardAktif || sedangProses) {
+        if (!siapMendeteksi || sedangProses) {
             return;
         }
 
-        // Resize yang tidak dikenali sebagai keyboard
-        // akan mengakhiri ujian.
-        akhiriUjian("Resize di luar kondisi keyboard");
+        periksaKeyboard();
+
+        if (keyboardAktif) {
+            return;
+        }
+
+        // Resize saja tidak cukup untuk memastikan
+        // siswa meninggalkan ujian.
+        // Pengakhiran dilakukan melalui pemeriksaan blur.
 
     }, TUNDA_RESIZE);
 }
@@ -149,77 +209,110 @@ function tanganiResize() {
 window.addEventListener("resize", tanganiResize);
 
 if (window.visualViewport) {
+
     window.visualViewport.addEventListener(
         "resize",
         tanganiResize
     );
+
 }
 
-// =======================================
-// BLUR WINDOW
-// =======================================
+// =============================================
+// 7. DETEKSI BLUR
+// =============================================
 
 window.addEventListener("blur", function () {
-    if (sedangProses) {
+
+    if (!siapMendeteksi || sedangProses) {
         return;
     }
 
     periksaKeyboard();
 
-    // Keyboard aktif: abaikan blur.
+    // Jangan akhiri ujian saat keyboard aktif.
     if (keyboardAktif) {
         return;
     }
 
-    if (timerBlur !== null) {
-        clearTimeout(timerBlur);
-    }
+    clearTimeout(timerBlur);
 
     timerBlur = setTimeout(function () {
+
         timerBlur = null;
 
-        if (sedangProses) {
+        if (!siapMendeteksi || sedangProses) {
             return;
         }
 
         periksaKeyboard();
 
-        // Periksa ulang untuk menghindari
-        // penghentian saat keyboard baru muncul.
+        // Periksa lagi setelah jeda karena keyboard
+        // mungkin baru muncul setelah event blur.
         if (keyboardAktif) {
             return;
         }
 
-        // Blur tanpa indikasi keyboard.
-        akhiriUjian("Window kehilangan fokus");
+        // Jika window sudah kembali fokus, abaikan.
+        if (document.hasFocus()) {
+            return;
+        }
+
+        // Blur tetap berlangsung tanpa indikasi keyboard.
+        akhiriUjian("Halaman kehilangan fokus");
 
     }, TUNDA_BLUR);
+
 });
 
-// =======================================
-// FOCUS WINDOW
-// =======================================
+// =============================================
+// 8. DETEKSI FOCUS
+// =============================================
 
 window.addEventListener("focus", function () {
-    if (timerBlur !== null) {
-        clearTimeout(timerBlur);
-        timerBlur = null;
+
+    clearTimeout(timerBlur);
+    timerBlur = null;
+
+    if (!siapMendeteksi || sedangProses) {
+        return;
     }
 
     periksaKeyboard();
+
+    // Perbarui tinggi dasar jika viewport sudah kembali
+    // mendekati ukuran sebelum keyboard muncul.
+    if (
+        Math.abs(tinggiAwal - tinggiViewport()) <=
+        BATAS_KEYBOARD
+    ) {
+
+        tinggiAwal = tinggiViewport();
+        keyboardAktif = false;
+
+    }
+
 });
 
-// =======================================
-// PERUBAHAN ORIENTASI
-// =======================================
+// =============================================
+// 9. PERUBAHAN ORIENTASI LAYAR
+// =============================================
 
-// Perbarui tinggi awal setelah rotasi layar agar
-// perubahan orientasi tidak selalu dianggap keyboard.
 window.addEventListener("orientationchange", function () {
+
+    clearTimeout(timerBlur);
+    clearTimeout(timerResize);
+
     setTimeout(function () {
-        tinggiAwal = tinggiSekarang();
+
+        if (sedangProses) {
+            return;
+        }
+
+        tinggiAwal = tinggiViewport();
         keyboardAktif = false;
-    }, 500);
+
+    }, 700);
+
 });
 
 </script>
