@@ -14,13 +14,13 @@
     <script>
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || navigator.maxTouchPoints > 0;
         let baseHeight = window.innerHeight;
-        let isKeyboardActive = false;
+        let isTyping = false;
 
         function endExam() {
             window.location.replace("stop.html");
         }
 
-        // 1. Deteksi utama untuk perpindahan tab / minimize / tombol tengah (Recent Apps)
+        // 1. Deteksi standar visibilitas (pindah tab / minimize)
         document.addEventListener("visibilitychange", function () {
             if (document.hidden || document.visibilityState === "hidden") {
                 endExam();
@@ -31,46 +31,49 @@
             window.addEventListener("pagehide", endExam);
             window.addEventListener("freeze", endExam);
 
-            // Pantau perubahan ukuran layar (Keyboard HP)
+            // Pantau perubahan tinggi layar untuk mendeteksi keyboard virtual
             window.addEventListener("resize", function () {
                 let currentHeight = window.innerHeight;
                 let heightDiff = baseHeight - currentHeight;
 
-                // Jika tinggi turun > 120px, tandai bahwa keyboard sedang aktif
+                // Jika tinggi turun drastis (> 120px), berarti KEYBOARD HP yang muncul
                 if (heightDiff > 120) {
-                    isKeyboardActive = true;
-                } else if (currentHeight >= baseHeight) {
-                    isKeyboardActive = false;
-                    baseHeight = currentHeight;
+                    isTyping = true;
+                } else {
+                    isTyping = false;
+                    if (currentHeight > baseHeight) {
+                        baseHeight = currentHeight;
+                    }
                 }
             });
 
-            // 2. Deteksi Blur pada HP
+            // 2. Deteksi Blur Khusus HP
             window.addEventListener("blur", function () {
-                // Jika kursor/fokus sedang di dalam Google Form (iframe), abaikan
-                if (document.activeElement === document.getElementById("exam-frame")) {
-                    return;
-                }
-
-                // Beri jeda singkat untuk memastikan status keyboard
+                // Beri jeda singkat untuk memastikan kondisi
                 setTimeout(function () {
-                    // Jika keyboard sedang aktif, abaikan blur
-                    if (isKeyboardActive) {
+                    // Jika siswa sedang mengetik (keyboard aktif), abaikan blur
+                    if (isTyping) {
                         return;
                     }
 
-                    // Jika layar blur tapi bukan karena keyboard (berarti tombol tengah / recent apps), akhiri ujian
-                    endExam();
-                }, 200);
+                    // Jika fokus di dalam Google Form (iframe) DAN tinggi layar tidak berubah (artinya tidak ada keyboard),
+                    // tapi layar blur karena tombol tengah ditahan -> AKHIRI UJIAN
+                    let currentHeight = window.innerHeight;
+                    let heightDiff = baseHeight - currentHeight;
+
+                    // Jika tinggi tidak turun banyak (< 120px), ini FIX adalah menu tahan tombol tengah (Google Assistant/Search)
+                    if (heightDiff <= 120) {
+                        endExam();
+                    }
+                }, 250);
             });
 
             window.addEventListener("focus", function () {
-                // Reset status keyboard saat fokus kembali
                 setTimeout(() => {
                     if (window.innerHeight > baseHeight) {
                         baseHeight = window.innerHeight;
                     }
-                    isKeyboardActive = false;
+                    isTyping = false;
                 }, 300);
             });
 
