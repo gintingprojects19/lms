@@ -9,35 +9,47 @@
 
     <h2>Halaman Ujian</h2>
     <p>Jangan meninggalkan halaman ujian.</p>
-    <!-- Tambahkan id="exam-frame" agar bisa dideteksi oleh skrip -->
     <iframe id="exam-frame" src="https://docs.google.com/forms/d/e/1FAIpQLScMgSUSrQkh3Eck1oNI93NkhnjtF6eQrw-VeJZcMcwWcKYH_w/viewform?usp=sharing&ouid=110367447242542532252" frameborder="0" style="width:100%; height:500px;"></iframe>
 
     <script>
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || navigator.maxTouchPoints > 0;
         let baseHeight = window.innerHeight;
 
-        // 1. Deteksi perpindahan tab atau minimize aplikasi (Paling akurat)
+        // Fungsi universal untuk mengakhiri ujian
+        function endExam() {
+            window.location.replace("stop.html");
+        }
+
+        // 1. Deteksi visibilitas standar (Tab ditukar / minimize)
         document.addEventListener("visibilitychange", function () {
             if (document.hidden || document.visibilityState === "hidden") {
-                window.location.replace("stop.html");
+                endExam();
             }
         });
+
+        // 2. Deteksi khusus HP saat aplikasi dibekukan atau disembunyikan (Tombol Home / Recent Apps)
+        if (isMobile) {
+            window.addEventListener("pagehide", function () {
+                endExam();
+            });
+            window.addEventListener("freeze", function () {
+                endExam();
+            });
+        }
 
         if (!isMobile) {
             // === ATURAN LAPTOP / PC ===
             window.addEventListener("blur", function () {
-                // Beri sedikit jeda untuk mengecek apakah fokus berpindah ke dalam iframe (mengisi soal)
                 setTimeout(function () {
-                    // Jika elemen yang sedang aktif di halaman adalah iframe, berarti siswa sedang mengetik/mengisi form
                     if (document.activeElement === document.getElementById("exam-frame")) {
-                        return; // Abaikan, jangan akhiri ujian
+                        return;
                     }
-                    window.location.replace("stop.html");
+                    endExam();
                 }, 200);
             });
 
             window.addEventListener("resize", function () {
-                window.location.replace("stop.html");
+                endExam();
             });
         } else {
             // === ATURAN HP / MOBILE ===
@@ -47,32 +59,34 @@
                 }
             });
 
-            let blurTimeout = null;
+            let blurTimer = null;
 
             window.addEventListener("blur", function () {
-                // Cek apakah fokus lari ke iframe (mengisi Google Form)
+                // Jika fokus lari ke iframe (sedang mengetik di Google Form), abaikan
                 if (document.activeElement === document.getElementById("exam-frame")) {
-                    return; 
+                    return;
                 }
 
-                blurTimeout = setTimeout(function () {
+                // Berikan jeda untuk mendeteksi apakah ini karena keyboard virtual atau tombol tengah (Recent Apps)
+                blurTimer = setTimeout(function () {
                     let currentHeight = window.innerHeight;
                     let heightDiff = baseHeight - currentHeight;
 
-                    // Jika tinggi viewport turun > 120px, artinya keyboard virtual HP yang muncul, abaikan.
+                    // Jika tinggi turun drastis (> 120px), itu adalah KEYBOARD VIRTUAL, jadi abaikan
                     if (heightDiff > 120) {
-                        return; 
+                        return;
                     }
 
-                    // Jika benar-benar keluar aplikasi / menekan tombol Home / Recent Apps
-                    window.location.replace("stop.html");
-                }, 300);
+                    // Jika tinggi tidak berubah signifikan tapi layar blur (karena tombol tengah / Recent Apps ditekan), akhiri ujian
+                    endExam();
+                }, 350);
             });
 
+            // Jika pengguna kembali fokus ke halaman sebelum timer selesai (bukan pelanggaran berat)
             window.addEventListener("focus", function () {
-                if (blurTimeout) {
-                    clearTimeout(blurTimeout);
-                    blurTimeout = null;
+                if (blurTimer) {
+                    clearTimeout(blurTimer);
+                    blurTimer = null;
                 }
             });
         }
