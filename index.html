@@ -14,12 +14,13 @@
     <script>
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || navigator.maxTouchPoints > 0;
         let baseHeight = window.innerHeight;
+        let isKeyboardActive = false;
 
         function endExam() {
             window.location.replace("stop.html");
         }
 
-        // 1. Deteksi visibilitas standar (pindah tab / minimize)
+        // 1. Deteksi utama untuk perpindahan tab / minimize / tombol tengah (Recent Apps)
         document.addEventListener("visibilitychange", function () {
             if (document.hidden || document.visibilityState === "hidden") {
                 endExam();
@@ -30,43 +31,48 @@
             window.addEventListener("pagehide", endExam);
             window.addEventListener("freeze", endExam);
 
-            // Perbarui baseHeight saat ukuran berubah (misal orientasi atau keyboard ditutup)
+            // Pantau perubahan ukuran layar (Keyboard HP)
             window.addEventListener("resize", function () {
-                if (window.innerHeight > baseHeight) {
-                    baseHeight = window.innerHeight;
+                let currentHeight = window.innerHeight;
+                let heightDiff = baseHeight - currentHeight;
+
+                // Jika tinggi turun > 120px, tandai bahwa keyboard sedang aktif
+                if (heightDiff > 120) {
+                    isKeyboardActive = true;
+                } else if (currentHeight >= baseHeight) {
+                    isKeyboardActive = false;
+                    baseHeight = currentHeight;
                 }
             });
 
-            // 2. PEMANTAUAN BERKALA (POLLING) KHUSUS HP
-            setInterval(function () {
-                // Jika halaman disembunyikan total
-                if (document.hidden || document.visibilityState === "hidden") {
-                    endExam();
+            // 2. Deteksi Blur pada HP
+            window.addEventListener("blur", function () {
+                // Jika kursor/fokus sedang di dalam Google Form (iframe), abaikan
+                if (document.activeElement === document.getElementById("exam-frame")) {
                     return;
                 }
 
-                // Cek jika halaman kehilangan fokus (termasuk saat layar blur karena tombol tengah ditahan)
-                if (!document.hasFocus()) {
-                    // Abaikan jika fokus sedang berada di dalam Google Form (iframe) untuk mengetik
-                    if (document.activeElement === document.getElementById("exam-frame")) {
+                // Beri jeda singkat untuk memastikan status keyboard
+                setTimeout(function () {
+                    // Jika keyboard sedang aktif, abaikan blur
+                    if (isKeyboardActive) {
                         return;
                     }
 
-                    // Cek perubahan tinggi layar untuk mendeteksi keyboard virtual HP
-                    let currentHeight = window.innerHeight;
-                    let heightDiff = baseHeight - currentHeight;
-
-                    // KUNCI UTAMA: Jika tinggi turun lebih dari 120 piksel, 
-                    // itu BERARTI KEYBOARD VIRTUAL yang muncul -> ABAIKAN BLUR
-                    if (heightDiff > 120) {
-                        return;
-                    }
-
-                    // Jika tinggi TIDAK turun drastis (artinya layar blur karena tombol tengah / recent apps), 
-                    // maka UJIAN BERAKHIR
+                    // Jika layar blur tapi bukan karena keyboard (berarti tombol tengah / recent apps), akhiri ujian
                     endExam();
-                }
-            }, 300);
+                }, 200);
+            });
+
+            window.addEventListener("focus", function () {
+                // Reset status keyboard saat fokus kembali
+                setTimeout(() => {
+                    if (window.innerHeight > baseHeight) {
+                        baseHeight = window.innerHeight;
+                    }
+                    isKeyboardActive = false;
+                }, 300);
+            });
 
         } else {
             // === ATURAN LAPTOP / PC ===
