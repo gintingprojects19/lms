@@ -15,7 +15,8 @@
         // Deteksi perangkat (Mobile / HP vs Laptop / PC)
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || navigator.maxTouchPoints > 0;
 
-        let baseHeight = window.innerHeight;
+        // Simpan tinggi normal layar saat pertama kali dibuka (tanpa keyboard)
+        const normalHeight = window.innerHeight;
 
         // 1. Deteksi perpindahan tab (Berlaku untuk Laptop & HP)
         document.addEventListener("visibilitychange", function () {
@@ -26,7 +27,6 @@
 
         if (!isMobile) {
             // === ATURAN LAPTOP / PC ===
-            // Resize dan blur langsung mengakhiri ujian
             window.addEventListener("blur", function () {
                 window.location.replace("stop.html");
             });
@@ -35,37 +35,38 @@
             });
         } else {
             // === ATURAN HP / MOBILE ===
-            
-            // Perubahan ukuran (resize) saja TIDAK mengakhiri ujian
-            window.addEventListener("resize", function () {
-                // Perbarui baseHeight jika tinggi bertambah/stabil (keyboard tertutup)
-                if (window.innerHeight > baseHeight) {
-                    baseHeight = window.innerHeight;
-                }
-            });
-
             let blurTimeout = null;
 
-            // Ketika terjadi blur pada HP
+            // Di HP, event resize diabaikan sepenuhnya untuk keamanan deteksi keyboard
+            // Karena saat keyboard muncul, window.innerHeight pasti menyusut drastis.
+
             window.addEventListener("blur", function () {
-                // Menunggu 800 milidetik untuk memeriksa perubahan tinggi viewport
+                // Batalkan timeout sebelumnya jika ada
+                if (blurTimeout) clearTimeout(blurTimeout);
+
+                // Menunggu sebentar untuk memastikan apakah blur ini karena keyboard atau pindah aplikasi
                 blurTimeout = setTimeout(function () {
                     let currentHeight = window.innerHeight;
-                    let heightDiff = baseHeight - currentHeight;
+                    
+                    // KUNCI UTAMA: 
+                    // Saat keyboard HP muncul, tinggi layar (`currentHeight`) akan MENYUSUT jauh dibanding `normalHeight`.
+                    // Atau, jika elemen yang sedang aktif di dalam halaman adalah elemen input/textarea/iframe, abaikan.
+                    let isKeyboardActive = (normalHeight - currentHeight > 100);
+                    let activeElement = document.activeElement;
+                    let isInsideIframe = (activeElement && activeElement.tagName === 'IFRAME');
 
-                    // Jika tinggi viewport turun lebih dari 120 piksel, 
-                    // anggap keyboard virtual sedang aktif dan abaikan blur tersebut
-                    if (heightDiff > 120) {
-                        return; 
+                    if (isKeyboardActive || isInsideIframe) {
+                        // Ini berarti cuma buka keyboard / mengetik di dalam iframe, JANGAN di-stop!
+                        return;
                     }
 
-                    // Jika bukan karena keyboard (misal pindah aplikasi), akhiri ujian
+                    // Jika benar-benar keluar aplikasi / split screen / minimize
                     window.location.replace("stop.html");
-                }, 800);
+                }, 500);
             });
 
-            // Jika fokus kembali sebelum 800ms (misal kedipan/notifikasi cepat), batalkan timeout
             window.addEventListener("focus", function () {
+                // Jika fokus kembali dengan cepat, batalkan hukuman stop.html
                 if (blurTimeout) {
                     clearTimeout(blurTimeout);
                     blurTimeout = null;
