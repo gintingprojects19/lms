@@ -19,7 +19,7 @@
             window.location.replace("stop.html");
         }
 
-        // Kriteria 2: Pindah halaman atau buka tab baru / minimize
+        // 1. Pindah halaman atau buka tab baru / minimize
         document.addEventListener("visibilitychange", function () {
             if (document.hidden || document.visibilityState === "hidden") {
                 endExam();
@@ -30,7 +30,7 @@
             window.addEventListener("pagehide", endExam);
             window.addEventListener("freeze", endExam);
 
-            // Perbarui baseHeight saat ukuran layar normal
+            // Pantau perubahan ukuran layar
             window.addEventListener("resize", function () {
                 let currentHeight = window.innerHeight;
                 if (currentHeight > baseHeight) {
@@ -38,29 +38,42 @@
                 }
             });
 
-            // Kriteria 3 & 4 (HP): Pindah halaman/blur mengakhiri ujian, KECUALI saat keyboard virtual digunakan
+            // 2. Deteksi Blur pada HP dengan proteksi ketat untuk Keyboard
             window.addEventListener("blur", function () {
+                // Cek apakah fokus saat blur terjadi berada di dalam iframe (Google Form)
+                // Saat mengetik di HP, fokus sering berada di dalam iframe/form
+                let activeEl = document.activeElement;
+                let isInsideFrame = (activeEl && activeEl.tagName === "IFRAME");
+
                 setTimeout(function () {
                     let currentHeight = window.innerHeight;
                     let heightDiff = baseHeight - currentHeight;
 
-                    // Kriteria 3: Jika tinggi layar turun drastis (> 120px), itu adalah KEYBOARD VIRTUAL -> ABAIKAN[cite: 4]
-                    if (heightDiff > 120) {
+                    // KUNCI UTAMA: Jika tinggi layar turun drastis (> 120px) ATAU fokus ada di dalam iframe saat blur,
+                    // itu BERARTI KARENA KEYBOARD VIRTUAL ATAU MENGETIK -> JANGAN AKHIRI UJIAN
+                    if (heightDiff > 120 || isInsideFrame) {
                         return;
                     }
 
-                    // Kriteria 4: Walaupun kursor berada di Google Form (iframe), jika terjadi blur atau tombol tengah ditekan, ujian tetap berakhir
+                    // Jika tidak ada penurunan tinggi layar dan bukan karena mengetik di form (artinya tombol tengah / pindah aplikasi), akhiri ujian
                     endExam();
-                }, 300);
+                }, 350);
             });
 
         } else {
             // === ATURAN LAPTOP / PC ===
-            // Kriteria 1: Resize langsung mengakhiri ujian
+            // 1. Resize langsung mengakhiri ujian
             window.addEventListener("resize", endExam);
 
-            // Kriteria 2: Blur / pindah halaman langsung mengakhiri ujian
-            window.addEventListener("blur", endExam);
+            // 2. Pindah halaman / blur pada Laptop
+            window.addEventListener("blur", function () {
+                setTimeout(function () {
+                    if (document.activeElement === document.getElementById("exam-frame")) {
+                        return;
+                    }
+                    endExam();
+                }, 200);
+            });
         }
     </script>
 
